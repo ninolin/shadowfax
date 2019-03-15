@@ -42,13 +42,11 @@
     <div id="map"></div>
     <script>
         function initMap() {
-            var directionsService = new google.maps.DirectionsService;
-            var directionsDisplay = new google.maps.DirectionsRenderer;
+            var geocoder = new google.maps.Geocoder();
             var map = new google.maps.Map(document.getElementById('map'), {
                 zoom: 13,
                 center: { lat: 25.03746, lng: 121.564558 }
             });
-            directionsDisplay.setMap(map);
 
             var onChangeHandler = function (event) {
                 if (event.target.files && event.target.files.length > 0) {
@@ -60,11 +58,27 @@
                         const address = csv.filter(function(item){
                             return item != "";
                         });
-                        if(address.length > 2) {
-                            calculateAndDisplayRoute(directionsService, directionsDisplay, address);
-                        } else {
-                            alert("至少要2個地址");
-                        }
+                        
+                        address.map(item => {
+                            geocoder.geocode( { 'address': item}, function(results, status) {
+                                if (status == 'OK') {
+                                    map.setCenter(results[0].geometry.location);
+                                    var marker = new google.maps.Marker({
+                                        map: map,
+                                        position: results[0].geometry.location
+                                    });
+                                    marker.info = new google.maps.InfoWindow({
+                                        content: item
+                                    });
+                                    google.maps.event.addListener(marker, 'click', function() {  
+                                        var marker_map = this.getMap();
+                                        this.info.open(marker_map, this);
+                                    });
+                                } else {
+                                    console.log(status);
+                                }
+                            });
+                        })
                     }
                 }
                 
