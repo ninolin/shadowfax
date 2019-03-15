@@ -47,7 +47,7 @@
                 zoom: 13,
                 center: { lat: 25.03746, lng: 121.564558 }
             });
-
+            var timeout = 600;
             var onChangeHandler = function (event) {
                 if (event.target.files && event.target.files.length > 0) {
                     let file = event.target.files[0];
@@ -55,72 +55,50 @@
                     reader.readAsText(file, 'big5');
                     reader.onload = (e) => {
                         const csv = reader.result.toString().split(/\r|\n|\r/);
-                        const address = csv.filter(function(item){
+                        const address = csv.filter(function (item) {
                             return item != "";
                         });
-                        
-                        address.map(item => {
-                            geocoder.geocode( { 'address': item}, function(results, status) {
-                                if (status == 'OK') {
-                                    map.setCenter(results[0].geometry.location);
-                                    var marker = new google.maps.Marker({
-                                        map: map,
-                                        position: results[0].geometry.location
+                        var start_unicode = 65;
+                        var legs_html = "";
+                        address.reduce((prev, curr, index) => {
+                            return prev.then(() => {
+                                return new Promise((resolve, reject) => {
+                                    const item = curr;
+                                    geocoder.geocode({ 'address': item }, async function (results, status) {
+                                        await sleep(550);
+                                        if (status == 'OK') {
+                                            map.setCenter(results[0].geometry.location);
+                                            var marker = new google.maps.Marker({
+                                                map: map,
+                                                position: results[0].geometry.location,
+                                                label: { text: String.fromCharCode(parseInt(start_unicode)), color: "white" }
+                                            });
+                                            legs_html += "<div>" + String.fromCharCode(parseInt(start_unicode)) + ": " + item + "</div>";
+                                            start_unicode++;
+                                            marker.info = new google.maps.InfoWindow({
+                                                content: item
+                                            });
+                                            google.maps.event.addListener(marker, 'click', function () {
+                                                var marker_map = this.getMap();
+                                                this.info.open(marker_map, this);
+                                            });
+                                            if (index == address.length-1) document.getElementById('legs-panel').innerHTML = legs_html;
+                                            resolve();
+                                        } else {
+                                            console.log(status);
+                                        }
                                     });
-                                    marker.info = new google.maps.InfoWindow({
-                                        content: item
-                                    });
-                                    google.maps.event.addListener(marker, 'click', function() {  
-                                        var marker_map = this.getMap();
-                                        this.info.open(marker_map, this);
-                                    });
-                                } else {
-                                    console.log(status);
-                                }
+                                });
                             });
-                        })
+                        }, Promise.resolve());
                     }
                 }
-                
+
             };
             document.getElementById('csv-uploader').addEventListener('change', onChangeHandler)
         }
-
-        function calculateAndDisplayRoute(directionsService, directionsDisplay, address) {
-            const waypoints_data = address.filter((item, index) => {
-                return index > 1;
-            }).map(function(item, index){
-                return {"location": item, "stopover": true};
-            });
-            directionsService.route({
-                origin: address[0],
-                destination: address[1],
-                waypoints: waypoints_data,
-                optimizeWaypoints: true,
-                provideRouteAlternatives: true,
-                travelMode: 'DRIVING',
-                drivingOptions: {
-                    departureTime: new Date(/* now, or future date */),
-                    trafficModel: 'bestguess'
-                },
-                unitSystem: google.maps.UnitSystem.IMPERIAL
-            }, function (response, status) {
-                if (status === 'OK') {
-                    directionsDisplay.setDirections(response);
-                    console.log(response);
-                    const legs = response.routes[0].legs;
-                    let legs_html = "";
-                    legs.map((item, index) => {
-                        if(index == 0) {
-                            legs_html += "<div>"+item.start_address+"</div>";
-                        }
-                        legs_html += "<div>"+item.end_address+"</div>";
-                    })
-                    document.getElementById('legs-panel').innerHTML = legs_html;
-                } else {
-                    window.alert('Directions request failed due to ' + status);
-                }
-            });
+        async function sleep(ms = 0) {
+            return new Promise(r => setTimeout(r, ms));
         }
     </script>
     <script async defer
